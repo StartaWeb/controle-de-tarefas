@@ -1,4 +1,4 @@
-# TaskFlow — Sistema de Gerenciamento de Tarefas
+# Startweb — Sistema de Gerenciamento de Tarefas
 
 Sistema web para gerenciamento de tarefas por setor, com controle de prazos, pessoas e produtividade.
 
@@ -69,7 +69,7 @@ ProjetoSeleste/
 4. Crie tarefas com prazos e responsáveis
 5. Acompanhe tudo pelo Dashboard
 
-## 👤 Autor
+## 👤 Autor Roberto Ursine
 
 **StartaWeb**  
 📞 (11) 99999-9999  
