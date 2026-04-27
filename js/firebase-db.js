@@ -16,14 +16,7 @@ const firebaseConfig = {
 const firebaseApp = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// Habilitar persistência offline
-db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-    if (err.code === 'failed-precondition') {
-        console.warn('Firebase: persistência offline indisponível (múltiplas abas).');
-    } else if (err.code === 'unimplemented') {
-        console.warn('Firebase: este navegador não suporta persistência offline.');
-    }
-});
+// Nota: persistência offline não habilitada para evitar conflitos em múltiplas abas.
 
 /**
  * DB — Camada de acesso ao Firestore
@@ -35,16 +28,31 @@ const DB = {
 
     /**
      * Carrega os itens de um documento Firestore.
+     * Timeout de 6 segundos para não travar o carregamento.
      * @param {string} docName - Nome do documento (ex: 'setores')
-     * @returns {Array|null} Array de itens ou null se o documento não existir
+     * @returns {Array|null} Array de itens ou null se não existir / timeout
      */
     async load(docName) {
+        const timeoutPromise = new Promise(resolve =>
+            setTimeout(() => {
+                console.warn(`[Firebase] Timeout ao carregar "${docName}" — usando fallback.`);
+                resolve('__timeout__');
+            }, 6000)
+        );
+
         try {
-            const snap = await db.collection(this.COLLECTION).doc(docName).get();
-            if (snap.exists) {
-                return snap.data().items || [];
+            const result = await Promise.race([
+                db.collection(this.COLLECTION).doc(docName).get(),
+                timeoutPromise
+            ]);
+
+            // Se chegou aqui por timeout, retornar null (aciona fallback)
+            if (result === '__timeout__') return null;
+
+            if (result.exists) {
+                return result.data().items || [];
             }
-            return null; // null = documento ainda não existe no Firestore
+            return null; // Documento não existe ainda
         } catch (err) {
             console.error(`[Firebase] Erro ao carregar "${docName}":`, err);
             return null;

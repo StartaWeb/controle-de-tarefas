@@ -26,6 +26,9 @@ const Data = {
         tarefas: null
     },
 
+    // Indica se o Firebase está acessível
+    _firebaseAvailable: false,
+
     // Setores padrão
     DEFAULT_SETORES: [
         { id: 'setor_rh', nome: 'RH', cor: '#f472b6', icone: '👥' },
@@ -48,15 +51,19 @@ const Data = {
             DB.load(this.KEYS.TAREFAS)
         ]);
 
+        // Verificar se o Firebase respondeu
+        const firebaseRespondeu = cloudSetores !== null || cloudPessoas !== null || cloudTarefas !== null;
+        this._firebaseAvailable = firebaseRespondeu;
+
         // --- SETORES ---
         if (cloudSetores !== null) {
             this._cache.setores = cloudSetores;
         } else {
-            // Migrar do LocalStorage ou usar padrão
             const local = this._readLocalStorage(this.LS_KEYS.SETORES);
             this._cache.setores = local || this.DEFAULT_SETORES;
-            await DB.save(this.KEYS.SETORES, this._cache.setores);
-            console.log('[Firebase] Setores migrados/inicializados no Firestore.');
+            // Só tenta salvar no Firestore se ele respondeu (para evitar duplo timeout)
+            if (firebaseRespondeu) await DB.save(this.KEYS.SETORES, this._cache.setores);
+            console.log('[Firebase] Setores: usando localStorage/padrão.');
         }
 
         // --- PESSOAS ---
@@ -65,8 +72,8 @@ const Data = {
         } else {
             const local = this._readLocalStorage(this.LS_KEYS.PESSOAS);
             this._cache.pessoas = local || [];
-            await DB.save(this.KEYS.PESSOAS, this._cache.pessoas);
-            console.log('[Firebase] Pessoas migradas/inicializadas no Firestore.');
+            if (firebaseRespondeu) await DB.save(this.KEYS.PESSOAS, this._cache.pessoas);
+            console.log('[Firebase] Pessoas: usando localStorage/padrão.');
         }
 
         // --- TAREFAS ---
@@ -75,11 +82,15 @@ const Data = {
         } else {
             const local = this._readLocalStorage(this.LS_KEYS.TAREFAS);
             this._cache.tarefas = local || [];
-            await DB.save(this.KEYS.TAREFAS, this._cache.tarefas);
-            console.log('[Firebase] Tarefas migradas/inicializadas no Firestore.');
+            if (firebaseRespondeu) await DB.save(this.KEYS.TAREFAS, this._cache.tarefas);
+            console.log('[Firebase] Tarefas: usando localStorage/padrão.');
         }
 
-        console.log('✅ Dados carregados do Firebase Firestore.');
+        if (firebaseRespondeu) {
+            console.log('✅ Dados carregados do Firebase Firestore.');
+        } else {
+            console.warn('⚠️ Firebase indisponível — usando dados locais.');
+        }
     },
 
     /**
@@ -96,8 +107,10 @@ const Data = {
 
     /**
      * Sincroniza uma coleção com o Firestore em background (fire-and-forget).
+     * Só sincroniza se o Firebase estiver disponível.
      */
     _sync(key, items) {
+        if (!this._firebaseAvailable) return; // offline, não tenta
         DB.save(key, items).catch(err =>
             console.error(`[Firebase] Falha ao sincronizar "${key}":`, err)
         );

@@ -7,18 +7,33 @@ const App = {
 
     async init() {
         // Mostrar tela de carregamento
-        this.showLoading();
+        this.showLoading('Conectando ao Firebase...');
+
+        // Timeout geral de segurança: 10 segundos no máximo
+        let firebaseOk = false;
+        const safetyTimeout = new Promise(resolve => setTimeout(resolve, 10000));
 
         try {
-            // Inicializar dados do Firebase (async)
-            await Data.init();
+            await Promise.race([Data.init(), safetyTimeout]);
+            firebaseOk = Data._cache.tarefas !== null;
         } catch (err) {
             console.error('[App] Falha ao conectar com Firebase:', err);
-            Utils.showToast('Erro ao conectar com o banco de dados. Tentando modo offline...', 'error');
         }
 
+        if (!firebaseOk) {
+            // Garantir que o cache tenha valores padrão
+            Data._cache.setores = Data._cache.setores || Data.DEFAULT_SETORES;
+            Data._cache.pessoas  = Data._cache.pessoas  || [];
+            Data._cache.tarefas  = Data._cache.tarefas  || [];
+        }
         // Esconder loading e mostrar app
         this.hideLoading();
+
+        if (!firebaseOk) {
+            setTimeout(() => Utils.showToast('Firebase indisponível — usando dados locais.', 'warning'), 400);
+        } else {
+            setTimeout(() => Utils.showToast('Firebase conectado! ☀️', 'success'), 400);
+        }
 
         // Renderizar todas as páginas
         this.renderAll();
@@ -59,8 +74,10 @@ const App = {
         console.log('✅ StartWeb iniciado com Firebase!');
     },
 
-    showLoading() {
+    showLoading(msg) {
         const el = document.getElementById('app-loading');
+        const txt = document.getElementById('loading-msg');
+        if (txt && msg) txt.textContent = msg;
         if (el) el.classList.add('active');
     },
 

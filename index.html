@@ -196,8 +196,8 @@
         </div>
     </div>
 
-    <!-- App Loading Screen -->
-    <div id="app-loading">
+    <!-- App Loading Screen — ativo por padrão, removido por JS após carregar -->
+    <div id="app-loading" class="active">
         <div class="loading-content">
             <div class="loading-logo">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -209,7 +209,7 @@
             </div>
             <div class="loading-brand">StartWeb</div>
             <div class="loading-spinner"></div>
-            <div class="loading-text">Conectando ao Firebase...</div>
+            <div class="loading-text" id="loading-msg">Conectando ao Firebase...</div>
         </div>
     </div>
 
