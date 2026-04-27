@@ -47,43 +47,53 @@ const Data = {
                 DB.load(this.KEYS.TAREFAS)
             ]);
 
+            // null = Firebase inacessível (timeout ou erro)
+            // []   = Firebase OK mas doc ainda não existe (banco novo)
+            // [...] = Firebase OK com dados
             const firebaseOk = cloudSetores !== null || cloudPessoas !== null || cloudTarefas !== null;
             this._firebaseAvailable = firebaseOk;
 
             if (!firebaseOk) {
-                console.warn('[Firebase] Indisponível — usando LocalStorage.');
+                console.warn('[Firebase] Inacessível — usando dados locais.');
                 return false;
             }
 
             let updated = false;
 
-            // Dados na nuvem têm prioridade. Se vazio, migrar do localStorage.
-            if (cloudSetores !== null && cloudSetores.length > 0) {
+            // SETORES
+            if (cloudSetores && cloudSetores.length > 0) {
+                // Nuvem tem dados → usar dados da nuvem
                 this._saveLS(this.LS_KEYS.SETORES, cloudSetores);
                 updated = true;
-            } else if (cloudSetores !== null && cloudSetores.length === 0) {
-                // Nuvem vazia → migrar dados locais para o Firestore
+            } else {
+                // Nuvem vazia ou doc novo → migrar dados locais para o Firestore
                 await DB.save(this.KEYS.SETORES, this.getSetores());
+                console.log('[Firebase] Setores migrados do LocalStorage para a nuvem.');
             }
 
-            if (cloudPessoas !== null && cloudPessoas.length > 0) {
+            // PESSOAS
+            if (cloudPessoas && cloudPessoas.length > 0) {
                 this._saveLS(this.LS_KEYS.PESSOAS, cloudPessoas);
                 updated = true;
-            } else if (cloudPessoas !== null && cloudPessoas.length === 0) {
+            } else {
                 await DB.save(this.KEYS.PESSOAS, this.getPessoas());
+                console.log('[Firebase] Pessoas migradas do LocalStorage para a nuvem.');
             }
 
-            if (cloudTarefas !== null && cloudTarefas.length > 0) {
+            // TAREFAS
+            if (cloudTarefas && cloudTarefas.length > 0) {
                 this._saveLS(this.LS_KEYS.TAREFAS, cloudTarefas);
                 updated = true;
-            } else if (cloudTarefas !== null && cloudTarefas.length === 0) {
+            } else {
                 await DB.save(this.KEYS.TAREFAS, this.getTarefas());
+                console.log('[Firebase] Tarefas migradas do LocalStorage para a nuvem.');
             }
 
-            console.log('✅ Firebase sincronizado!');
+            console.log('✅ Firebase sincronizado com sucesso!');
             return updated;
         } catch (err) {
             console.error('[Firebase] Erro no sync:', err);
+            this._firebaseAvailable = false;
             return false;
         }
     },

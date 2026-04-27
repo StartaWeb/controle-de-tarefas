@@ -28,16 +28,17 @@ const DB = {
 
     /**
      * Carrega os itens de um documento Firestore.
-     * Timeout de 6 segundos para não travar o carregamento.
-     * @param {string} docName - Nome do documento (ex: 'setores')
-     * @returns {Array|null} Array de itens ou null se não existir / timeout
+     * Retorna:
+     *   Array com dados → documento existe e tem dados
+     *   []              → Firebase conectado mas documento ainda não existe (banco novo)
+     *   null            → timeout ou erro (Firebase inacessível)
      */
     async load(docName) {
         const timeoutPromise = new Promise(resolve =>
             setTimeout(() => {
                 console.warn(`[Firebase] Timeout ao carregar "${docName}" — usando fallback.`);
                 resolve('__timeout__');
-            }, 6000)
+            }, 8000)
         );
 
         try {
@@ -46,16 +47,19 @@ const DB = {
                 timeoutPromise
             ]);
 
-            // Se chegou aqui por timeout, retornar null (aciona fallback)
+            // Timeout → Firebase inacessível
             if (result === '__timeout__') return null;
 
+            // Documento existe → retornar dados
             if (result.exists) {
                 return result.data().items || [];
             }
-            return null; // Documento não existe ainda
+
+            // Documento não existe ainda (banco novo/vazio) → [] indica Firebase OK
+            return [];
         } catch (err) {
             console.error(`[Firebase] Erro ao carregar "${docName}":`, err);
-            return null;
+            return null; // null = Firebase inacessível
         }
     },
 
