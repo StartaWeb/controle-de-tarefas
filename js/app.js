@@ -6,24 +6,19 @@ const App = {
     currentPage: 'dashboard',
 
     init() {
-        // ─── PASSO 1: Inicialização instantânea ──────────────────────────
-        // Carrega dados do LocalStorage — zero delay, sem spinner.
-        Data.initSync();
+        // Passo 1: Iniciar dados do LocalStorage (instantâneo)
+        Data.init();
 
-        // Renderizar e configurar o app imediatamente
+        // Renderizar e configurar tudo imediatamente
         this.renderAll();
         this.setupNavigation();
         this.setupModal();
         this.startClock();
 
-        document.getElementById('btn-new-task').addEventListener('click', () => {
-            Tarefas.openForm();
-        });
-
+        document.getElementById('btn-new-task').addEventListener('click', () => Tarefas.openForm());
         document.getElementById('menu-toggle').addEventListener('click', () => {
             document.getElementById('sidebar').classList.toggle('open');
         });
-
         document.getElementById('main-content').addEventListener('click', () => {
             document.getElementById('sidebar').classList.remove('open');
         });
@@ -33,33 +28,27 @@ const App = {
             this.navigateTo(hash);
         }
 
-        console.log('✅ StartWeb iniciado (dados locais).');
+        console.log('✅ StartWeb iniciado (LocalStorage).');
 
-        // ─── PASSO 2: Sincronização Firebase em background ───────────────
-        // Não bloqueia o app. Se Firebase responder, re-renderiza.
+        // Passo 2: Sincronizar Firebase em background (sem bloquear a UI)
         this._syncFirebase();
     },
 
-    // Sincroniza com Firebase em background sem bloquear a UI
     async _syncFirebase() {
         this._setFirebaseStatus('syncing');
-
         try {
-            const updated = await Data.syncFromFirebase();
-
-            if (updated) {
-                // Re-renderiza com dados atualizados da nuvem
-                this.renderAll();
+            const updated = await Data.syncFirebase();
+            if (Data._firebaseAvailable) {
                 this._setFirebaseStatus('online');
-                Utils.showToast('Firebase sincronizado! ☁️', 'success');
-            } else if (Data._firebaseAvailable) {
-                this._setFirebaseStatus('online');
+                if (updated) {
+                    this.renderAll(); // atualizar UI com dados da nuvem
+                    Utils.showToast('Dados sincronizados com Firebase! ☁️', 'success');
+                }
             } else {
                 this._setFirebaseStatus('offline');
-                Utils.showToast('Sem acesso ao Firebase — usando dados locais.', 'warning');
             }
         } catch (err) {
-            console.error('[App] Erro ao sincronizar Firebase:', err);
+            console.error('[App] Erro Firebase:', err);
             this._setFirebaseStatus('offline');
         }
     },
@@ -68,14 +57,10 @@ const App = {
         const dot = document.getElementById('connection-status');
         if (!dot) return;
         dot.className = 'connection-dot';
-        if (status === 'online')   dot.classList.add('online');
-        if (status === 'offline')  dot.classList.add('offline');
-        if (status === 'syncing')  dot.classList.add('syncing');
-        dot.title = {
-            online:  'Firebase conectado',
-            offline: 'Firebase indisponível — dados locais',
-            syncing: 'Sincronizando com Firebase...'
-        }[status] || '';
+        if (status === 'online')  dot.classList.add('online');
+        if (status === 'offline') dot.classList.add('offline');
+        if (status === 'syncing') dot.classList.add('syncing');
+        dot.title = { online: 'Firebase conectado ✅', offline: 'Firebase indisponível — dados locais', syncing: 'Sincronizando...' }[status] || '';
     },
 
     renderAll() {
@@ -103,20 +88,11 @@ const App = {
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.toggle('active', item.dataset.page === pageName);
         });
-
-        document.querySelectorAll('.page').forEach(page => {
-            page.classList.remove('active');
-        });
+        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
         const targetPage = document.getElementById(`page-${pageName}`);
         if (targetPage) targetPage.classList.add('active');
 
-        const titles = {
-            dashboard: 'Dashboard',
-            tarefas: 'Tarefas',
-            pessoas: 'Colaboradores',
-            setores: 'Setores',
-            relatorios: 'Relatórios'
-        };
+        const titles = { dashboard: 'Dashboard', tarefas: 'Tarefas', pessoas: 'Colaboradores', setores: 'Setores', relatorios: 'Relatórios' };
         document.getElementById('topbar-title').textContent = titles[pageName] || pageName;
 
         switch (pageName) {
@@ -133,12 +109,8 @@ const App = {
     setupModal() {
         const overlay = document.getElementById('modal-overlay');
         const closeBtn = document.getElementById('modal-close');
-
         closeBtn.addEventListener('click', () => Utils.closeModal());
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) Utils.closeModal();
-        });
-
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) Utils.closeModal(); });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 Utils.closeModal();
@@ -152,22 +124,12 @@ const App = {
             const now = new Date();
             const clockEl = document.getElementById('sidebar-clock');
             const dateEl  = document.getElementById('sidebar-date');
-
-            if (clockEl) {
-                clockEl.textContent = now.toLocaleTimeString('pt-BR', {
-                    hour: '2-digit', minute: '2-digit', second: '2-digit'
-                });
-            }
-            if (dateEl) {
-                dateEl.textContent = now.toLocaleDateString('pt-BR', {
-                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                });
-            }
+            if (clockEl) clockEl.textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            if (dateEl)  dateEl.textContent  = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
         };
         update();
         setInterval(update, 1000);
     }
 };
 
-// Start app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => App.init());
