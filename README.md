@@ -1,78 +1,152 @@
-# Startweb — Sistema de Gerenciamento de Tarefas
+# 📋 StartWeb — Sistema de Gerenciamento de Tarefas
 
-Sistema web para gerenciamento de tarefas por setor, com controle de prazos, pessoas e produtividade.
+Sistema web para controle de tarefas por setor, com sincronização em nuvem via Firebase Firestore.
 
-## 🚀 Funcionalidades
+---
 
-### Dashboard
-- Cards com estatísticas gerais (total, em dia, atrasadas, concluídas)
-- Progresso por setor com barras visuais
-- Alertas de tarefas atrasadas e próximas do vencimento
-- Tarefas recentes
+## 🌐 Acesso ao Sistema
 
-### Gestão de Tarefas
-- Criar, editar e excluir tarefas
-- Atribuir responsável e setor
-- Definir prazos e prioridades (Alta, Média, Baixa)
-- Status: Pendente → Em Andamento → Concluída
-- Detecção automática de atrasos
-- Filtros por setor, responsável, status e prioridade
+| Recurso | Link |
+|---|---|
+| **Aplicação (produção)** | https://startaweb.github.io/controle-de-tarefas/ |
+| **Repositório GitHub** | https://github.com/StartaWeb/controle-de-tarefas |
+| **Console Firebase** | https://console.firebase.google.com/project/startweb-tarefas |
+| **Banco de Dados (Firestore)** | https://console.firebase.google.com/project/startweb-tarefas/firestore/data |
+| **Regras do Banco** | https://console.firebase.google.com/project/startweb-tarefas/firestore/rules |
 
-### Gestão de Pessoas
-- Cadastro de colaboradores com nome, cargo e setor
-- Visualização de carga de trabalho individual
-- Estatísticas por pessoa (ativas, atrasadas, concluídas)
+---
 
-### Gestão de Setores
-- Setores padrão: RH, Financeiro, Administrativo, Operacional, Comercial
-- Criar setores personalizados com cor e ícone
-- Progresso de conclusão por setor
+## 🗄️ Banco de Dados
 
-### Relatórios
-- **Relatório Geral** — Todas as tarefas com status e prazos (PDF)
-- **Relatório por Setor** — Agrupado por departamento (PDF)
-- **Relatório por Pessoa** — Produtividade individual (PDF)
-- **Tarefas Atrasadas** — Lista detalhada de atrasos (PDF)
-- **Exportar CSV** — Tarefas e pessoas para Excel
+### Provedor
+**Firebase Firestore** (Google Cloud) — Plano Blaze (pay-as-you-go com tier gratuito)
 
-## 🛠️ Tecnologias
+### Projeto Firebase
+- **Project ID:** `startweb-tarefas`
+- **Auth Domain:** `startweb-tarefas.firebaseapp.com`
+- **Região:** `us-central1` (padrão)
 
-- HTML5 + CSS3 + JavaScript (Vanilla)
-- LocalStorage para persistência de dados
-- Sem dependências externas
-- Compatível com GitHub Pages
-
-## 📁 Estrutura
+### Estrutura das Coleções
 
 ```
-ProjetoSeleste/
-├── index.html
+startweb_data/              ← Coleção principal
+├── setores                 ← Documento: lista de setores
+│   └── items: [ { id, nome, cor, icone } ]
+├── pessoas                 ← Documento: lista de colaboradores
+│   └── items: [ { id, nome, cargo, setor, criadoEm } ]
+└── tarefas                 ← Documento: lista de tarefas
+    └── items: [ { id, titulo, descricao, setor, responsavel, prazo, prioridade, status, criadoEm } ]
+```
+
+### Regras de Segurança (Firestore Rules)
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /startweb_data/{document} {
+      allow read, write: if true;  // Modo de teste — válido por 30 dias
+    }
+  }
+}
+```
+> ⚠️ Renovar as regras após 30 dias no [Console Firebase → Regras](https://console.firebase.google.com/project/startweb-tarefas/firestore/rules)
+
+---
+
+## 🚀 Deploy
+
+O deploy é automático via **GitHub Pages**:
+
+1. Faça as alterações no código
+2. Execute no terminal:
+   ```bash
+   git add .
+   git commit -m "descrição da alteração"
+   git push origin main
+   ```
+3. Aguarde ~2 minutos
+4. Acesse: https://startaweb.github.io/controle-de-tarefas/
+
+---
+
+## 📁 Estrutura de Arquivos
+
+```
+controle-de-tarefas/
+├── index.html              ← Página principal (estrutura HTML)
 ├── css/
-│   └── style.css
+│   └── style.css           ← Estilos (tema escuro, componentes)
 ├── js/
-│   ├── app.js
-│   ├── data.js
-│   ├── dashboard.js
-│   ├── pessoas.js
-│   ├── tarefas.js
-│   ├── setores.js
-│   ├── relatorios.js
-│   └── utils.js
-└── README.md
+│   ├── firebase-db.js      ← Configuração Firebase + operações Firestore
+│   ├── data.js             ← Camada de dados (LocalStorage + Firebase sync)
+│   ├── app.js              ← Inicialização e roteamento
+│   ├── utils.js            ← Funções utilitárias (toast, modal, datas)
+│   ├── dashboard.js        ← Página: Dashboard e estatísticas
+│   ├── tarefas.js          ← Página: Gerenciamento de tarefas
+│   ├── pessoas.js          ← Página: Gerenciamento de colaboradores
+│   ├── setores.js          ← Página: Gerenciamento de setores
+│   └── relatorios.js       ← Página: Relatórios e exportação
+└── README.md               ← Esta documentação
 ```
 
-## 📖 Como Usar
+---
 
-1. Abra o arquivo `index.html` no navegador
-2. Cadastre seus setores (já vem com 5 padrão)
-3. Adicione colaboradores e atribua a setores
-4. Crie tarefas com prazos e responsáveis
-5. Acompanhe tudo pelo Dashboard
+## ⚙️ Arquitetura de Dados
 
-## 👤 Autor Roberto Ursine
+```
+Abertura do app
+      ↓
+LocalStorage (instantâneo)  ←── Dados sempre disponíveis offline
+      ↓
+App renderiza imediatamente
+      ↓
+Firebase sync em background (8s timeout)
+      ├─ Firebase OK → 🟢 Verde — dados sincronizados na nuvem
+      └─ Firebase offline → 🔴 Vermelho — continua com dados locais
+```
 
-**StartaWeb**  
-📞 (11) 99999-9999  
-📧 contato@startaweb.com.br
+**Escrita de dados:**
+- Salva no **LocalStorage** (imediato, síncrono)
+- Salva no **Firestore** em background (assíncrono)
 
-> Projeto criado com **Google Antigravity** 🚀
+**Indicador no sidebar:**
+| Cor | Significado |
+|---|---|
+| 🟡 Amarelo piscando | Sincronizando com Firebase |
+| 🟢 Verde pulsando | Firebase conectado |
+| 🔴 Vermelho | Firebase indisponível — dados locais |
+
+---
+
+## 🔧 Funcionalidades
+
+| Módulo | Função |
+|---|---|
+| **Dashboard** | Visão geral: total de tarefas, atrasadas, concluídas, alertas |
+| **Tarefas** | Criar, editar, excluir, filtrar por setor/pessoa/status/prioridade |
+| **Colaboradores** | Cadastro de pessoas vinculadas a setores |
+| **Setores** | Criação de setores com cor e ícone personalizados |
+| **Relatórios** | Exportação CSV, impressão, gráficos por setor e pessoa |
+
+---
+
+## 💰 Custo do Firebase
+
+**Plano Blaze** (ativado) — Inclui tier gratuito:
+
+| Operação | Limite gratuito/dia | Uso estimado |
+|---|---|---|
+| Leituras | 50.000 | ~300/dia |
+| Gravações | 20.000 | ~50/dia |
+| Armazenamento | 1 GB | < 1 MB |
+| **Custo mensal** | **R$ 0,00** | ✅ |
+
+---
+
+## 👨‍💻 Desenvolvedor
+
+**Roberto Ursine**
+📞 (11) 98285-6216
+
+**Empresa:** StartWeb
+**Repositório:** https://github.com/StartaWeb/controle-de-tarefas
