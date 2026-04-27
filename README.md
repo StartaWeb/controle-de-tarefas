@@ -10,9 +10,8 @@ Sistema web para controle de tarefas por setor, com sincronização em nuvem via
 |---|---|
 | **Aplicação (produção)** | https://startaweb.github.io/controle-de-tarefas/ |
 | **Repositório GitHub** | https://github.com/StartaWeb/controle-de-tarefas |
-| **Console Firebase** | https://console.firebase.google.com/project/startweb-tarefas |
-| **Banco de Dados (Firestore)** | https://console.firebase.google.com/project/startweb-tarefas/firestore/data |
-| **Regras do Banco** | https://console.firebase.google.com/project/startweb-tarefas/firestore/rules |
+
+> 🔒 Os links do Console Firebase e credenciais são mantidos em documento interno separado.
 
 ---
 
@@ -22,9 +21,12 @@ Sistema web para controle de tarefas por setor, com sincronização em nuvem via
 **Firebase Firestore** (Google Cloud) — Plano Blaze (pay-as-you-go com tier gratuito)
 
 ### Projeto Firebase
-- **Project ID:** `startweb-tarefas`
-- **Auth Domain:** `startweb-tarefas.firebaseapp.com`
-- **Região:** `us-central1` (padrão)
+- **Project ID:** `startweb-tarefas` (ver credenciais internas)
+- **Região:** `us-central1`
+
+> ⚠️ **Segurança:** A API Key está no código público. Para proteger o banco:
+> 1. Restrinja a API Key ao domínio `https://startaweb.github.io/*` no [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+> 2. Renove as regras do Firestore a cada 30 dias
 
 ### Estrutura das Coleções
 

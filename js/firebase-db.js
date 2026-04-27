@@ -1,5 +1,5 @@
 /* ===================================================
-   Firebase DB — Configuração e operações Firestore
+   Firebase DB — Configuração, Auth Anônima e Firestore
    =================================================== */
 
 const firebaseConfig = {
@@ -14,26 +14,49 @@ const firebaseConfig = {
 
 // Inicializar Firebase
 const firebaseApp = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db         = firebase.firestore();
+const auth       = firebase.auth();
 
-// Nota: persistência offline não habilitada para evitar conflitos em múltiplas abas.
+/**
+ * authReady — Promise que resolve quando o usuário estiver autenticado.
+ * O app faz login anônimo automaticamente na inicialização.
+ * Isso garante que todas as chamadas ao Firestore tenham um token de auth válido.
+ */
+const authReady = new Promise((resolve, reject) => {
+    // Observar mudança de estado de autenticação
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            console.log(`[Firebase Auth] Autenticado: ${user.uid} (anônimo: ${user.isAnonymous})`);
+            resolve(user);
+        }
+    });
+
+    // Tentar login anônimo
+    auth.signInAnonymously().catch(err => {
+        console.warn('[Firebase Auth] Login anônimo falhou:', err.message);
+        resolve(null); // Fallback: continuar sem auth (Firestore pode bloquear)
+    });
+
+    // Timeout de segurança: 5s para o auth responder
+    setTimeout(() => resolve(null), 5000);
+});
 
 /**
  * DB — Camada de acesso ao Firestore
- * Armazena cada coleção como um único documento na collection "startweb_data"
- * para simplicidade e menor número de operações.
+ * Cada coleção é armazenada como um único documento com array "items".
+ *
+ * Retorno de DB.load():
+ *   Array   → documento existe com dados
+ *   []      → Firebase OK, documento não existe ainda (banco novo)
+ *   null    → timeout ou erro (Firebase inacessível / sem auth)
  */
 const DB = {
     COLLECTION: 'startweb_data',
 
-    /**
-     * Carrega os itens de um documento Firestore.
-     * Retorna:
-     *   Array com dados → documento existe e tem dados
-     *   []              → Firebase conectado mas documento ainda não existe (banco novo)
-     *   null            → timeout ou erro (Firebase inacessível)
-     */
     async load(docName) {
+        // Aguardar autenticação antes de acessar o banco
+        await authReady;
+
         const timeoutPromise = new Promise(resolve =>
             setTimeout(() => {
                 console.warn(`[Firebase] Timeout ao carregar "${docName}" — usando fallback.`);
@@ -47,28 +70,23 @@ const DB = {
                 timeoutPromise
             ]);
 
-            // Timeout → Firebase inacessível
             if (result === '__timeout__') return null;
 
-            // Documento existe → retornar dados
             if (result.exists) {
                 return result.data().items || [];
             }
 
-            // Documento não existe ainda (banco novo/vazio) → [] indica Firebase OK
-            return [];
+            return []; // Documento não existe ainda — Firebase OK
         } catch (err) {
             console.error(`[Firebase] Erro ao carregar "${docName}":`, err);
-            return null; // null = Firebase inacessível
+            return null;
         }
     },
 
-    /**
-     * Salva um array de itens em um documento Firestore.
-     * @param {string} docName - Nome do documento
-     * @param {Array} items - Array de itens a salvar
-     */
     async save(docName, items) {
+        // Aguardar autenticação antes de salvar
+        await authReady;
+
         try {
             await db.collection(this.COLLECTION).doc(docName).set({
                 items,
@@ -79,9 +97,6 @@ const DB = {
         }
     },
 
-    /**
-     * Verifica se o Firebase está conectado
-     */
     isOnline() {
         return navigator.onLine;
     }
