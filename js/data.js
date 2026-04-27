@@ -43,54 +43,59 @@ const Data = {
      * Se o Firestore estiver vazio, migra dados do LocalStorage.
      * Deve ser chamado com await antes de renderizar qualquer página.
      */
-    async init() {
-        // Carregar as três coleções em paralelo
+    /**
+     * PASSO 1 — Inicialização instantânea a partir do LocalStorage.
+     * Síncrona, zero delay. O app fica pronto imediatamente.
+     */
+    initSync() {
+        this._cache.setores = this._readLocalStorage(this.LS_KEYS.SETORES) || this.DEFAULT_SETORES;
+        this._cache.pessoas  = this._readLocalStorage(this.LS_KEYS.PESSOAS)  || [];
+        this._cache.tarefas  = this._readLocalStorage(this.LS_KEYS.TAREFAS)  || [];
+        console.log('[Data] Cache iniciado a partir do LocalStorage.');
+    },
+
+    /**
+     * PASSO 2 — Sincronização assíncrona com o Firebase (rodando em background).
+     * Se o Firebase responder, atualiza o cache e retorna true.
+     * Se não responder (timeout/erro), mantém dados locais e retorna false.
+     */
+    async syncFromFirebase() {
         const [cloudSetores, cloudPessoas, cloudTarefas] = await Promise.all([
             DB.load(this.KEYS.SETORES),
             DB.load(this.KEYS.PESSOAS),
             DB.load(this.KEYS.TAREFAS)
         ]);
 
-        // Verificar se o Firebase respondeu
-        const firebaseRespondeu = cloudSetores !== null || cloudPessoas !== null || cloudTarefas !== null;
-        this._firebaseAvailable = firebaseRespondeu;
+        const firebaseOk = cloudSetores !== null || cloudPessoas !== null || cloudTarefas !== null;
+        this._firebaseAvailable = firebaseOk;
 
-        // --- SETORES ---
-        if (cloudSetores !== null) {
-            this._cache.setores = cloudSetores;
-        } else {
-            const local = this._readLocalStorage(this.LS_KEYS.SETORES);
-            this._cache.setores = local || this.DEFAULT_SETORES;
-            // Só tenta salvar no Firestore se ele respondeu (para evitar duplo timeout)
-            if (firebaseRespondeu) await DB.save(this.KEYS.SETORES, this._cache.setores);
-            console.log('[Firebase] Setores: usando localStorage/padrão.');
+        if (!firebaseOk) {
+            console.warn('[Firebase] Indisponível — mantendo dados locais.');
+            return false;
         }
 
-        // --- PESSOAS ---
-        if (cloudPessoas !== null) {
-            this._cache.pessoas = cloudPessoas;
-        } else {
-            const local = this._readLocalStorage(this.LS_KEYS.PESSOAS);
-            this._cache.pessoas = local || [];
-            if (firebaseRespondeu) await DB.save(this.KEYS.PESSOAS, this._cache.pessoas);
-            console.log('[Firebase] Pessoas: usando localStorage/padrão.');
-        }
+        // Atualizar cache com dados da nuvem
+        let updated = false;
+        if (cloudSetores !== null) { this._cache.setores = cloudSetores; updated = true; }
+        if (cloudPessoas  !== null) { this._cache.pessoas  = cloudPessoas;  updated = true; }
+        if (cloudTarefas  !== null) { this._cache.tarefas  = cloudTarefas;  updated = true; }
 
-        // --- TAREFAS ---
-        if (cloudTarefas !== null) {
-            this._cache.tarefas = cloudTarefas;
-        } else {
-            const local = this._readLocalStorage(this.LS_KEYS.TAREFAS);
-            this._cache.tarefas = local || [];
-            if (firebaseRespondeu) await DB.save(this.KEYS.TAREFAS, this._cache.tarefas);
-            console.log('[Firebase] Tarefas: usando localStorage/padrão.');
-        }
+        // Se era a primeira vez (sem dados locais), salvar defaults no Firestore
+        if (cloudSetores === null) await DB.save(this.KEYS.SETORES, this._cache.setores);
+        if (cloudPessoas  === null) await DB.save(this.KEYS.PESSOAS,  this._cache.pessoas);
+        if (cloudTarefas  === null) await DB.save(this.KEYS.TAREFAS,  this._cache.tarefas);
 
-        if (firebaseRespondeu) {
-            console.log('✅ Dados carregados do Firebase Firestore.');
-        } else {
-            console.warn('⚠️ Firebase indisponível — usando dados locais.');
-        }
+        console.log('✅ Firebase sincronizado!');
+        return updated;
+    },
+
+    /**
+     * Inicialização completa (compatibilidade retroativa).
+     * Chama initSync + syncFromFirebase em sequência.
+     */
+    async init() {
+        this.initSync();
+        return this.syncFromFirebase();
     },
 
     /**
