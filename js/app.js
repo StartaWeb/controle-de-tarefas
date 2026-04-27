@@ -5,9 +5,20 @@
 const App = {
     currentPage: 'dashboard',
 
-    init() {
-        // Inicializar dados
-        Data.init();
+    async init() {
+        // Mostrar tela de carregamento
+        this.showLoading();
+
+        try {
+            // Inicializar dados do Firebase (async)
+            await Data.init();
+        } catch (err) {
+            console.error('[App] Falha ao conectar com Firebase:', err);
+            Utils.showToast('Erro ao conectar com o banco de dados. Tentando modo offline...', 'error');
+        }
+
+        // Esconder loading e mostrar app
+        this.hideLoading();
 
         // Renderizar todas as páginas
         this.renderAll();
@@ -42,7 +53,23 @@ const App = {
             this.navigateTo(hash);
         }
 
-        console.log('✅ StartWeb iniciado com sucesso!');
+        // Indicador de status de conexão
+        this.setupConnectionStatus();
+
+        console.log('✅ StartWeb iniciado com Firebase!');
+    },
+
+    showLoading() {
+        const el = document.getElementById('app-loading');
+        if (el) el.classList.add('active');
+    },
+
+    hideLoading() {
+        const el = document.getElementById('app-loading');
+        if (el) {
+            el.classList.add('fade-out');
+            setTimeout(() => el.remove(), 600);
+        }
     },
 
     renderAll() {
@@ -120,6 +147,28 @@ const App = {
                 document.getElementById('confirm-overlay').classList.remove('active');
             }
         });
+    },
+
+    setupConnectionStatus() {
+        const indicator = document.getElementById('connection-status');
+        if (!indicator) return;
+
+        const update = () => {
+            if (navigator.onLine) {
+                indicator.classList.remove('offline');
+                indicator.classList.add('online');
+                indicator.title = 'Conectado ao Firebase';
+            } else {
+                indicator.classList.remove('online');
+                indicator.classList.add('offline');
+                indicator.title = 'Sem conexão — dados salvos localmente';
+                Utils.showToast('Sem conexão. Alterações salvas localmente.', 'warning');
+            }
+        };
+
+        update();
+        window.addEventListener('online', () => { update(); Utils.showToast('Conexão restabelecida! Sincronizando...', 'success'); });
+        window.addEventListener('offline', update);
     },
 
     startClock() {

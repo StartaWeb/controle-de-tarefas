@@ -1,12 +1,29 @@
 /* ===================================================
-   Data — Gerenciamento de dados com LocalStorage
+   Data — Gerenciamento de dados com Firebase Firestore
+   Cache em memória para operações síncronas,
+   sincronização assíncrona com a nuvem.
    =================================================== */
 
 const Data = {
+    // Nomes dos documentos no Firestore
     KEYS: {
+        SETORES: 'setores',
+        PESSOAS: 'pessoas',
+        TAREFAS: 'tarefas'
+    },
+
+    // Chaves legadas do LocalStorage (para migração)
+    LS_KEYS: {
         SETORES: 'startweb_setores',
         PESSOAS: 'startweb_pessoas',
         TAREFAS: 'startweb_tarefas'
+    },
+
+    // Cache em memória — permite que todos os métodos permaneçam síncronos
+    _cache: {
+        setores: null,
+        pessoas: null,
+        tarefas: null
     },
 
     // Setores padrão
@@ -19,31 +36,82 @@ const Data = {
     ],
 
     /**
-     * Inicializa dados padrão se não existirem
+     * Inicializa os dados: carrega do Firestore.
+     * Se o Firestore estiver vazio, migra dados do LocalStorage.
+     * Deve ser chamado com await antes de renderizar qualquer página.
      */
-    init() {
-        if (!localStorage.getItem(this.KEYS.SETORES)) {
-            this.saveSetores(this.DEFAULT_SETORES);
+    async init() {
+        // Carregar as três coleções em paralelo
+        const [cloudSetores, cloudPessoas, cloudTarefas] = await Promise.all([
+            DB.load(this.KEYS.SETORES),
+            DB.load(this.KEYS.PESSOAS),
+            DB.load(this.KEYS.TAREFAS)
+        ]);
+
+        // --- SETORES ---
+        if (cloudSetores !== null) {
+            this._cache.setores = cloudSetores;
+        } else {
+            // Migrar do LocalStorage ou usar padrão
+            const local = this._readLocalStorage(this.LS_KEYS.SETORES);
+            this._cache.setores = local || this.DEFAULT_SETORES;
+            await DB.save(this.KEYS.SETORES, this._cache.setores);
+            console.log('[Firebase] Setores migrados/inicializados no Firestore.');
         }
-        if (!localStorage.getItem(this.KEYS.PESSOAS)) {
-            this.savePessoas([]);
+
+        // --- PESSOAS ---
+        if (cloudPessoas !== null) {
+            this._cache.pessoas = cloudPessoas;
+        } else {
+            const local = this._readLocalStorage(this.LS_KEYS.PESSOAS);
+            this._cache.pessoas = local || [];
+            await DB.save(this.KEYS.PESSOAS, this._cache.pessoas);
+            console.log('[Firebase] Pessoas migradas/inicializadas no Firestore.');
         }
-        if (!localStorage.getItem(this.KEYS.TAREFAS)) {
-            this.saveTarefas([]);
+
+        // --- TAREFAS ---
+        if (cloudTarefas !== null) {
+            this._cache.tarefas = cloudTarefas;
+        } else {
+            const local = this._readLocalStorage(this.LS_KEYS.TAREFAS);
+            this._cache.tarefas = local || [];
+            await DB.save(this.KEYS.TAREFAS, this._cache.tarefas);
+            console.log('[Firebase] Tarefas migradas/inicializadas no Firestore.');
         }
+
+        console.log('✅ Dados carregados do Firebase Firestore.');
+    },
+
+    /**
+     * Lê e parseia um item do LocalStorage com segurança.
+     */
+    _readLocalStorage(key) {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    },
+
+    /**
+     * Sincroniza uma coleção com o Firestore em background (fire-and-forget).
+     */
+    _sync(key, items) {
+        DB.save(key, items).catch(err =>
+            console.error(`[Firebase] Falha ao sincronizar "${key}":`, err)
+        );
     },
 
     // ===== SETORES =====
+
     getSetores() {
-        try {
-            return JSON.parse(localStorage.getItem(this.KEYS.SETORES)) || this.DEFAULT_SETORES;
-        } catch {
-            return this.DEFAULT_SETORES;
-        }
+        return this._cache.setores || this.DEFAULT_SETORES;
     },
 
     saveSetores(setores) {
-        localStorage.setItem(this.KEYS.SETORES, JSON.stringify(setores));
+        this._cache.setores = setores;
+        this._sync(this.KEYS.SETORES, setores);
     },
 
     getSetorById(id) {
@@ -80,16 +148,14 @@ const Data = {
     },
 
     // ===== PESSOAS =====
+
     getPessoas() {
-        try {
-            return JSON.parse(localStorage.getItem(this.KEYS.PESSOAS)) || [];
-        } catch {
-            return [];
-        }
+        return this._cache.pessoas || [];
     },
 
     savePessoas(pessoas) {
-        localStorage.setItem(this.KEYS.PESSOAS, JSON.stringify(pessoas));
+        this._cache.pessoas = pessoas;
+        this._sync(this.KEYS.PESSOAS, pessoas);
     },
 
     getPessoaById(id) {
@@ -129,16 +195,14 @@ const Data = {
     },
 
     // ===== TAREFAS =====
+
     getTarefas() {
-        try {
-            return JSON.parse(localStorage.getItem(this.KEYS.TAREFAS)) || [];
-        } catch {
-            return [];
-        }
+        return this._cache.tarefas || [];
     },
 
     saveTarefas(tarefas) {
-        localStorage.setItem(this.KEYS.TAREFAS, JSON.stringify(tarefas));
+        this._cache.tarefas = tarefas;
+        this._sync(this.KEYS.TAREFAS, tarefas);
     },
 
     getTarefaById(id) {
@@ -187,6 +251,7 @@ const Data = {
     },
 
     // ===== ESTATÍSTICAS =====
+
     getStats() {
         const tarefas = this.getTarefas();
         const today = Utils.today();

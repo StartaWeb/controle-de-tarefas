@@ -12,6 +12,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+
+    <!-- Firebase v10 Compat CDN -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 
 <body>
@@ -86,6 +90,10 @@
         <div class="sidebar-footer">
             <div class="sidebar-clock" id="sidebar-clock"></div>
             <div class="sidebar-date" id="sidebar-date"></div>
+            <div class="firebase-status" title="Status Firebase">
+                <span id="connection-status" class="connection-dot" title="Verificando conexão..."></span>
+                <span class="firebase-label">Firebase</span>
+            </div>
         </div>
     </aside>
 
@@ -188,8 +196,26 @@
         </div>
     </div>
 
+    <!-- App Loading Screen -->
+    <div id="app-loading">
+        <div class="loading-content">
+            <div class="loading-logo">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M2 17l10 5 10-5" />
+                    <path d="M2 12l10 5 10-5" />
+                </svg>
+            </div>
+            <div class="loading-brand">StartWeb</div>
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Conectando ao Firebase...</div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="js/utils.js"></script>
+    <script src="js/firebase-db.js"></script>
     <script src="js/data.js"></script>
     <script src="js/dashboard.js"></script>
     <script src="js/pessoas.js"></script>
