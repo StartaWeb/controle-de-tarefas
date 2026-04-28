@@ -4,8 +4,38 @@
 
 const App = {
     currentPage: 'dashboard',
+    currentUser: null,
+    userProfile: null,
 
-    init() {
+    async init() {
+        // Aguarda autenticação
+        this.currentUser = await authReady;
+        if (!this.currentUser) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        // Busca o perfil do usuário
+        try {
+            const doc = await db.collection('usuarios').doc(this.currentUser.uid).get();
+            if (doc.exists) {
+                this.userProfile = doc.data();
+                if (this.userProfile.perfil !== 'admin') {
+                    alert('DEBUG: Documento encontrado, mas o perfil está como: ' + this.userProfile.perfil);
+                }
+            } else {
+                alert('DEBUG: O Firebase procurou o documento com o UID [' + this.currentUser.uid + '] mas não encontrou nada na coleção usuarios!');
+                this.userProfile = { perfil: 'colaborador' }; // Fallback
+            }
+        } catch (e) {
+            console.error('Erro ao buscar perfil:', e);
+            alert('Aviso: Erro de Permissão no Banco de Dados!\n\nSeu banco está bloqueando a leitura do perfil. Atualize as Regras do Firestore.\nDetalhe: ' + e.message);
+            this.userProfile = { perfil: 'colaborador' };
+        }
+
+        // Aplica permissões na UI
+        this.applyPermissions();
+
         // Passo 1: Iniciar dados do LocalStorage (instantâneo)
         Data.init();
 
@@ -22,16 +52,36 @@ const App = {
         document.getElementById('main-content').addEventListener('click', () => {
             document.getElementById('sidebar').classList.remove('open');
         });
+        
+        // Logout
+        document.getElementById('nav-logout').addEventListener('click', async (e) => {
+            e.preventDefault();
+            await auth.signOut();
+            window.location.href = 'login.html';
+        });
 
         const hash = window.location.hash.replace('#', '');
-        if (hash && ['dashboard', 'tarefas', 'pessoas', 'setores', 'relatorios'].includes(hash)) {
+        if (this.userProfile.perfil === 'colaborador') {
+            this.navigateTo('tarefas');
+        } else if (hash && ['dashboard', 'tarefas', 'pessoas', 'setores', 'relatorios'].includes(hash)) {
             this.navigateTo(hash);
+        } else {
+            this.navigateTo('dashboard');
         }
 
-        console.log('✅ StartWeb iniciado (LocalStorage).');
+        console.log(`✅ StartWeb logado como ${this.userProfile.perfil} (LocalStorage).`);
 
         // Passo 2: Sincronizar Firebase em background (sem bloquear a UI)
         this._syncFirebase();
+    },
+
+    applyPermissions() {
+        if (this.userProfile.perfil === 'colaborador') {
+            document.getElementById('nav-dashboard').style.display = 'none';
+            document.getElementById('nav-pessoas').style.display = 'none';
+            document.getElementById('nav-setores').style.display = 'none';
+            document.getElementById('nav-relatorios').style.display = 'none';
+        }
     },
 
     async _syncFirebase() {

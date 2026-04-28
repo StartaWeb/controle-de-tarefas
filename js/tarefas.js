@@ -4,10 +4,16 @@
 
 const Tarefas = {
     render() {
-        const tarefas = Data.getTarefas();
+        let tarefas = Data.getTarefas();
         const setores = Data.getSetores();
         const pessoas = Data.getPessoas();
         const page = document.getElementById('page-tarefas');
+        
+        const isColaborador = App.userProfile?.perfil === 'colaborador';
+        if (isColaborador && App.currentUser) {
+            const myPessoa = pessoas.find(p => p.uid === App.currentUser.uid);
+            tarefas = myPessoa ? tarefas.filter(t => t.responsavel === myPessoa.id) : [];
+        }
 
         page.innerHTML = `
             <div class="section-header">
@@ -17,10 +23,12 @@ const Tarefas = {
                     </div>
                     Tarefas
                 </h2>
+                ${!isColaborador ? `
                 <button class="btn btn-primary" onclick="Tarefas.openForm()" id="btn-add-tarefa">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     <span>Nova Tarefa</span>
                 </button>
+                ` : ''}
             </div>
 
             <!-- Filtros -->
@@ -117,6 +125,8 @@ const Tarefas = {
                 statusLabel = task.status === 'em_andamento' ? 'Em Andamento' : 'Pendente';
         }
 
+        const isColaborador = App.userProfile?.perfil === 'colaborador';
+        
         return `
             <div class="task-item" data-id="${task.id}">
                 <div class="task-item-priority ${task.prioridade}" title="Prioridade ${Utils.priorityLabel(task.prioridade)}"></div>
@@ -153,12 +163,14 @@ const Tarefas = {
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
                         </button>
                     `}
+                    ${!isColaborador ? `
                     <button class="btn-icon" onclick="event.stopPropagation(); Tarefas.openForm('${task.id}')" title="Editar">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
                     <button class="btn-icon" onclick="event.stopPropagation(); Tarefas.delete('${task.id}')" title="Excluir">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                     </button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -173,6 +185,12 @@ const Tarefas = {
 
         let tarefas = Data.getTarefas();
         const today = Utils.today();
+        
+        const isColaborador = App.userProfile?.perfil === 'colaborador';
+        if (isColaborador && App.currentUser) {
+            const myPessoa = Data.getPessoas().find(p => p.uid === App.currentUser.uid);
+            tarefas = myPessoa ? tarefas.filter(t => t.responsavel === myPessoa.id) : [];
+        }
 
         if (search) {
             tarefas = tarefas.filter(t => {

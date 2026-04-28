@@ -18,27 +18,20 @@ const db         = firebase.firestore();
 const auth       = firebase.auth();
 
 /**
- * authReady — Promise que resolve quando o usuário estiver autenticado.
- * O app faz login anônimo automaticamente na inicialização.
- * Isso garante que todas as chamadas ao Firestore tenham um token de auth válido.
+ * authReady — Promise que resolve quando o estado de autenticação for determinado.
  */
-const authReady = new Promise((resolve, reject) => {
+const authReady = new Promise((resolve) => {
     // Observar mudança de estado de autenticação
-    auth.onAuthStateChanged(user => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
         if (user) {
-            console.log(`[Firebase Auth] Autenticado: ${user.uid} (anônimo: ${user.isAnonymous})`);
+            console.log(`[Firebase Auth] Autenticado: ${user.email} (UID: ${user.uid})`);
             resolve(user);
+        } else {
+            console.log('[Firebase Auth] Nenhum usuário logado.');
+            resolve(null);
         }
+        unsubscribe(); // Resolvemos a promise na primeira verificação
     });
-
-    // Tentar login anônimo
-    auth.signInAnonymously().catch(err => {
-        console.warn('[Firebase Auth] Login anônimo falhou:', err.message);
-        resolve(null); // Fallback: continuar sem auth (Firestore pode bloquear)
-    });
-
-    // Timeout de segurança: 5s para o auth responder
-    setTimeout(() => resolve(null), 5000);
 });
 
 /**

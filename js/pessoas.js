@@ -133,13 +133,32 @@ const Pessoas = {
                         <input type="text" class="form-input" id="pessoa-cargo" placeholder="Ex: Analista" value="${pessoa ? Utils.escapeHtml(pessoa.cargo || '') : ''}">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="pessoa-setor">Setor *</label>
-                        <select class="form-select" id="pessoa-setor" required>
-                            <option value="">Selecione...</option>
+                        <label class="form-label" for="pessoa-setor">Setor</label>
+                        <select class="form-select" id="pessoa-setor">
+                            <option value="">Nenhum / Selecione...</option>
                             ${setores.map(s => `<option value="${s.id}" ${pessoa && pessoa.setor === s.id ? 'selected' : ''}>${Utils.escapeHtml(s.nome)}</option>`).join('')}
                         </select>
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="pessoa-email">E-mail de Acesso *</label>
+                        <input type="email" class="form-input" id="pessoa-email" placeholder="usuario@empresa.com" required value="${pessoa ? Utils.escapeHtml(pessoa.email || '') : ''}" ${isEdit ? 'disabled title="O E-mail não pode ser alterado"' : ''}>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="pessoa-perfil">Nível de Acesso *</label>
+                        <select class="form-select" id="pessoa-perfil" required>
+                            <option value="colaborador" ${pessoa && pessoa.perfil === 'colaborador' ? 'selected' : ''}>Colaborador</option>
+                            <option value="admin" ${pessoa && pessoa.perfil === 'admin' ? 'selected' : ''}>Administrador</option>
+                        </select>
+                    </div>
+                </div>
+                ${!isEdit ? `
+                <div class="form-group">
+                    <label class="form-label" for="pessoa-senha">Senha Temporária *</label>
+                    <input type="password" class="form-input" id="pessoa-senha" placeholder="Mínimo de 6 caracteres" required minlength="6">
+                </div>
+                ` : ''}
             </form>
         `;
 
@@ -154,30 +173,63 @@ const Pessoas = {
         setTimeout(() => document.getElementById('pessoa-nome')?.focus(), 100);
     },
 
-    save(editId) {
+    async save(editId) {
         const nome = document.getElementById('pessoa-nome').value.trim();
         const cargo = document.getElementById('pessoa-cargo').value.trim();
         const setor = document.getElementById('pessoa-setor').value;
+        const email = document.getElementById('pessoa-email').value.trim();
+        const perfil = document.getElementById('pessoa-perfil').value;
+        const senha = document.getElementById('pessoa-senha')?.value;
 
-        if (!nome) {
-            Utils.showToast('Informe o nome do colaborador.', 'error');
+        if (!nome || !email) {
+            Utils.showToast('Informe o nome e e-mail.', 'error');
             return;
         }
-        if (!setor) {
-            Utils.showToast('Selecione um setor.', 'error');
-            return;
-        }
 
-        if (editId) {
-            Data.updatePessoa(editId, { nome, cargo, setor });
-            Utils.showToast('Colaborador atualizado com sucesso!', 'success');
-        } else {
-            Data.addPessoa({ nome, cargo, setor });
-            Utils.showToast('Colaborador adicionado com sucesso!', 'success');
-        }
+        const btn = document.querySelector('.modal-footer .btn-primary');
+        if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
 
-        Utils.closeModal();
-        this.render();
+        try {
+            if (editId) {
+                // Edit
+                Data.updatePessoa(editId, { nome, cargo, setor, perfil });
+                const pessoa = Data.getPessoaById(editId);
+                if (pessoa && pessoa.uid) {
+                    await db.collection('usuarios').doc(pessoa.uid).update({ perfil, nome }).catch(console.error);
+                }
+                Utils.showToast('Colaborador atualizado com sucesso!', 'success');
+            } else {
+                if (!senha || senha.length < 6) {
+                    throw new Error('A senha deve ter pelo menos 6 caracteres.');
+                }
+                
+                // Novo usuário no Auth
+                const secondaryApp = firebase.initializeApp(firebaseConfig, "Secondary");
+                const userCred = await secondaryApp.auth().createUserWithEmailAndPassword(email, senha);
+                const uid = userCred.user.uid;
+                await secondaryApp.auth().signOut();
+                await secondaryApp.delete();
+
+                // Novo usuário no Firestore
+                await db.collection('usuarios').doc(uid).set({
+                    email, perfil, nome, criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                Data.addPessoa({ nome, cargo, setor, email, perfil, uid });
+                Utils.showToast('Colaborador adicionado com sucesso!', 'success');
+            }
+
+            Utils.closeModal();
+            this.render();
+        } catch (err) {
+            console.error(err);
+            if (err.code === 'auth/email-already-in-use') {
+                Utils.showToast('Este e-mail já está cadastrado no sistema.', 'error');
+            } else {
+                Utils.showToast(err.message || 'Erro ao salvar colaborador.', 'error');
+            }
+            if (btn) { btn.disabled = false; btn.textContent = editId ? 'Salvar Alterações' : 'Adicionar'; }
+        }
     },
 
     async delete(id) {
